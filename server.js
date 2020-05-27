@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 
 const app = express();
 
@@ -24,6 +25,7 @@ const database = {
 }
 
 app.use(express.json());
+app.use(cors());
 
 app.get("/", (req, res) => {
     res.send(database.users);
@@ -32,7 +34,7 @@ app.get("/", (req, res) => {
 app.post("/signin", (req, res) => {
     if (req.body.email === database.users[1].email &&
         req.body.password === database.users[1].password) {
-            res.json("success");
+            res.json(database.users[1]);
         } else {
             res.status(400).json("error logging in")
         }
