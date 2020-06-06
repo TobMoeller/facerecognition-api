@@ -26,25 +26,47 @@ app.get('/', (req, res) => {
 })
 
 app.post('/signin', (req, res) => {
-    if (req.body.email === database.users[1].email &&
-        req.body.password === database.users[1].password) {
-            res.json(database.users[1]);
+    db.select('*').from('login')
+    .where('email', req.body.email)
+    .then(storedCredentials => {
+        const isValid = req.body.password === storedCredentials[0].hash;
+        if (isValid) {
+            return db.select('*').from('users')
+                .where('email', storedCredentials[0].email)
+                .then(user => {
+                    res.json(user[0]);
+                })
+                .catch(err => res.status(400).json('failed to get credentials'))
         } else {
-            res.status(400).json('error logging in')
+            res.status(400).json('wrong credentials');
         }
+    })
+    .catch(err => res.status(400).json('wrong credentials'))
 })
 
 app.post('/register', (req, res) => {
     const { email, name, password } = req.body;
-    db('users')
-        .returning('*')
+    db.transaction(trx => {
+        trx('login')
         .insert({
-            name: name,
-            email: email,
-            joined: new Date(),
+            hash: password,
+            email: email
         })
-        .then(user => res.json(user[0]))
-        .catch(err => res.status(400).json('unable to register'));
+        .returning('email')
+        .then(loginEmail => {
+            return trx('users')
+                .returning('*')
+                .insert({
+                    email: loginEmail[0],
+                    name: name,
+                    joined: new Date()
+                })
+                .then(user => res.json(user[0]))
+                .then(trx.commit)
+                .catch(trx.rollback)
+        })
+        .catch(err => res.status(400).json('something went wrong registering'))
+    })
 })
 
 app.get('/profile/:id', (req, res) => {
