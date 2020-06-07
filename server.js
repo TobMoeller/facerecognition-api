@@ -1,89 +1,92 @@
-const express = require("express");
-const cors = require("cors");
+const express = require('express');
+const cors = require('cors');
+const db = require('knex')({
+    client: 'pg',
+    connection: {
+      host : '127.0.0.1',
+      user : 'postgres',
+      password : '55tZweHG0o8C8KkYkLzF',
+      database : 'facerecognitiondb'
+    }
+});
 
 const app = express();
 
-const database = {
-    users: [
-        {
-            id: "123",
-            name: "Mary",
-            email: "mary@mary.de",
-            password: "pw1234",
-            entries: 0,
-            joined: new Date(),
-        },
-        {
-            id: "124",
-            name: "Cary",
-            email: "cary@cary.de",
-            password: "pw4321",
-            entries: 0,
-            joined: new Date(),
-        }
-    ]
-}
+// ------ Middleware ------
 
 app.use(express.json());
 app.use(cors());
 
-app.get("/", (req, res) => {
-    res.send(database.users);
+// ------ RESTful API ------
+
+app.get('/', (req, res) => {
+    db.select('*').from('users')
+    .then(users => res.json(users))
+    .catch(err => res.status(400).json('couldnt get the users'));
 })
 
-app.post("/signin", (req, res) => {
-    if (req.body.email === database.users[1].email &&
-        req.body.password === database.users[1].password) {
-            res.json(database.users[1]);
+app.post('/signin', (req, res) => {
+    db.select('*').from('login')
+    .where('email', req.body.email)
+    .then(storedCredentials => {
+        const isValid = req.body.password === storedCredentials[0].hash;
+        if (isValid) {
+            return db.select('*').from('users')
+                .where('email', storedCredentials[0].email)
+                .then(user => {
+                    res.json(user[0]);
+                })
+                .catch(err => res.status(400).json('failed to get credentials'))
         } else {
-            res.status(400).json("error logging in")
+            res.status(400).json('wrong credentials');
         }
+    })
+    .catch(err => res.status(400).json('wrong credentials'))
 })
 
-app.post("/register", (req, res) => {
+app.post('/register', (req, res) => {
     const { email, name, password } = req.body;
-    database.users.push({
-        id: "125",
-        name: name,
-        email: email,
-        password: password,
-        entries: 0,
-        joined: new Date(),
+    db.transaction(trx => {
+        trx('login')
+        .insert({
+            hash: password,
+            email: email
+        })
+        .returning('email')
+        .then(loginEmail => {
+            return trx('users')
+                .returning('*')
+                .insert({
+                    email: loginEmail[0],
+                    name: name,
+                    joined: new Date()
+                })
+                .then(user => res.json(user[0]))
+                .then(trx.commit)
+                .catch(trx.rollback)
+        })
+        .catch(err => res.status(400).json('something went wrong registering'))
     })
-    res.json(database.users[database.users.length-1]);
 })
 
-app.get("/profile/:id", (req, res) => {
+app.get('/profile/:id', (req, res) => {
     const  { id } = req.params;
-    let found = false;
-    database.users.forEach(user => {
-        if (user.id === id) {
-            found = true;
-            return res.json(user);
-        }
-    })
-    if (!found) {
-        return res.status(400).json("user not found");
-    }
+    db.select('*').from('users').where('id', id)
+    .then(user => user.length ? res.json(user[0]) : res.status(400).json('this user does not exist'))
+    .catch(err => res.status(400).json('error finding the user'))
 })
 
-app.put("/image", (req, res) => {
+app.put('/image', (req, res) => {
     const  { id } = req.body;
-    let found = false;
-    database.users.forEach(user => {
-        if (user.id === id) {
-            found = true;
-            user.entries++;
-            return res.json(user.entries);
-        }
-    })
-    if (!found) {
-        return res.status(400).json("user not found");
-    }
+    db('users').where('id', id)
+    .increment('entries', 1)
+    .returning('entries')
+    .then(entries => res.json(entries[0]))
+    .catch(err => res.status(400).json("this entry got lost"))
 })
 
 // Applistener on Port 3000
 
 app.listen(3000, ()=> {
-    console.log("app is running on port 3000")
+    console.log('app is running on port 3000')
 })
