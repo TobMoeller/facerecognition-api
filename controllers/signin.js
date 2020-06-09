@@ -1,8 +1,12 @@
 const handleSignIn = (req, res, db) => {
+    const {email, password} = req.body;
+    if (!email || !password) {
+        return res.status(400).json('something is wrong with your entries')
+    }
     db.select('*').from('login')
-    .where('email', req.body.email)
+    .where('email', email)
     .then(storedCredentials => {
-        const isValid = req.body.password === storedCredentials[0].hash;
+        const isValid = password === storedCredentials[0].hash;
         if (isValid) {
             return db.select('*').from('users')
                 .where('email', storedCredentials[0].email)

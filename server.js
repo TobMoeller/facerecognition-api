@@ -36,6 +36,7 @@ app.post('/register', (req, res) => register.handleRegister(req, res, db))
 app.get('/profile/:id', (req, res) => profile.handleProfileGet(req, res, db))
 //alternate way of calling the function (fktn gets run twice, once with (db), then with (req, res))
 app.put('/image', imageSubmit.handleImageSubmit(db))
+app.post('/imageurl', imageSubmit.handleApiCall)
 
 // Applistener on Port 3000
 
