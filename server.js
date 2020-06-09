@@ -9,6 +9,10 @@ const db = require('knex')({
       database : 'facerecognitiondb'
     }
 });
+const register = require('./controllers/register');
+const signIn = require('./controllers/signin');
+const profile = require('./controllers/profile');
+const imageSubmit = require('./controllers/imageSubmit');
 
 const app = express();
 
@@ -25,65 +29,14 @@ app.get('/', (req, res) => {
     .catch(err => res.status(400).json('couldnt get the users'));
 })
 
-app.post('/signin', (req, res) => {
-    db.select('*').from('login')
-    .where('email', req.body.email)
-    .then(storedCredentials => {
-        const isValid = req.body.password === storedCredentials[0].hash;
-        if (isValid) {
-            return db.select('*').from('users')
-                .where('email', storedCredentials[0].email)
-                .then(user => {
-                    res.json(user[0]);
-                })
-                .catch(err => res.status(400).json('failed to get credentials'))
-        } else {
-            res.status(400).json('wrong credentials');
-        }
-    })
-    .catch(err => res.status(400).json('wrong credentials'))
-})
+app.post('/signin', (req, res) => signIn.handleSignIn(req, res, db))
 
-app.post('/register', (req, res) => {
-    const { email, name, password } = req.body;
-    db.transaction(trx => {
-        trx('login')
-        .insert({
-            hash: password,
-            email: email
-        })
-        .returning('email')
-        .then(loginEmail => {
-            return trx('users')
-                .returning('*')
-                .insert({
-                    email: loginEmail[0],
-                    name: name,
-                    joined: new Date()
-                })
-                .then(user => res.json(user[0]))
-                .then(trx.commit)
-                .catch(trx.rollback)
-        })
-        .catch(err => res.status(400).json('something went wrong registering'))
-    })
-})
+app.post('/register', (req, res) => register.handleRegister(req, res, db))
 
-app.get('/profile/:id', (req, res) => {
-    const  { id } = req.params;
-    db.select('*').from('users').where('id', id)
-    .then(user => user.length ? res.json(user[0]) : res.status(400).json('this user does not exist'))
-    .catch(err => res.status(400).json('error finding the user'))
-})
-
-app.put('/image', (req, res) => {
-    const  { id } = req.body;
-    db('users').where('id', id)
-    .increment('entries', 1)
-    .returning('entries')
-    .then(entries => res.json(entries[0]))
-    .catch(err => res.status(400).json("this entry got lost"))
-})
+app.get('/profile/:id', (req, res) => profile.handleProfileGet(req, res, db))
+//alternate way of calling the function (fktn gets run twice, once with (db), then with (req, res))
+app.put('/image', imageSubmit.handleImageSubmit(db))
+app.post('/imageurl', imageSubmit.handleApiCall)
 
 // Applistener on Port 3000
 
