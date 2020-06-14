@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
 const db = require('knex')({
@@ -5,7 +6,7 @@ const db = require('knex')({
     connection: {
       host : '127.0.0.1',
       user : 'postgres',
-      password : '55tZweHG0o8C8KkYkLzF',
+      password : process.env.DB_PW,
       database : 'facerecognitiondb'
     }
 });
@@ -13,7 +14,6 @@ const register = require('./controllers/register');
 const signIn = require('./controllers/signin');
 const profile = require('./controllers/profile');
 const imageSubmit = require('./controllers/imageSubmit');
-
 const app = express();
 
 // ------ Middleware ------
